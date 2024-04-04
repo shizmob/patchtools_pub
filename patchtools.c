@@ -18,7 +18,7 @@ epatch_file_t epatch_out;
 uint8_t data_in[2048];
 
 /* Command line flags */
-int extract_patch_flag, dump_patch_flag, create_patch_flag, help_flag;
+int extract_patch_flag, dump_patch_flag, create_patch_flag, brute_patch_flag, help_flag;
 
 /* Command line arguments */
 char *patch_path;
@@ -26,13 +26,14 @@ char *config_path;
 char *msram_path;
 uint32_t patch_seed;
 uint32_t key_override;
+uint64_t key_count;
 
 void usage( const char *reason ) {
 	fprintf( stderr, "%s\n", reason );
 	fprintf( stderr,
 	"\tpatchtools -h\n" );
 	fprintf( stderr,
-	"\tpatchtools [-dec] [-p <patch.dat>] [-k KEY] [-i <config.txt>]\n\n" );
+	"\tpatchtools [-bdec] [-p <patch.dat>] [-k KEY] [-n COUNT] [-i <config.txt>]\n\n" );
 
 	if ( !help_flag )
 		exit( EXIT_FAILURE );
@@ -45,6 +46,9 @@ void usage( const char *reason ) {
 	"\tand the author takes no responsibility for any damages resulting  \n"
 	"\tfrom use of the software.\n"
 	"\t\t-h                Print this message and exit\n"
+	"\t\t\n"
+	"\t\t-b <patch.dat>    Brute-force a patch key, using patch.dat\n"
+	"\t\t                  as known-plaintext source\n"
 	"\t\t\n"
 	"\t\t-e                Extract a patch to a configuration and \n"
 	"\t\t                  MSRAM hexdump file\n"
@@ -67,19 +71,26 @@ void usage( const char *reason ) {
 	"\t\t                  will use the path of the patch file to \n"
 	"\t\t                  generate the output path.\n"
 	"\t\t\n"
-	"\t\t-k KEY            Specifies key value to use while crypting\n"
-	"\t\t                  patch file.\n");
+	"\t\t-k KEY            Specifies key value to use while crypting,\n"
+	"\t\t                  or start key to use while brute-forcing\n"
+	"\t\t                  patch file.\n"
+	"\t\t\n"
+	"\t\t-n COUNT          Specifies number of keys to try while  \n"
+	"\t\t                  brute-forcing patch file.\n");
 }
 
 void parse_args( int argc, char *const *argv ) {
 	char opt;
-	while ( (opt = getopt( argc, argv, ":p:i:dechk:" )) != -1 ) {
+	while ( (opt = getopt( argc, argv, ":p:i:bdechk:n:" )) != -1 ) {
 		switch( opt ) {
 			case 'p':
 				patch_path = strdup( optarg );
 				break;
 			case 'i':
 				config_path = strdup( optarg );
+				break;
+			case 'b':
+				brute_patch_flag = 1;
 				break;
 			case 'd':
 				dump_patch_flag = 1;
@@ -92,6 +103,9 @@ void parse_args( int argc, char *const *argv ) {
 				break;
 			case 'k':
 				key_override = strtoul(optarg, NULL, 0);
+				break;
+			case 'n':
+				key_count = strtoul(optarg, NULL, 0);
 				break;
 			case 'h':
 				help_flag = 1;
@@ -302,6 +316,32 @@ int main( int argc, char * const *argv ) {
 		/* The user requested the built in documentation */
 		usage("");
 
+	} else if ( brute_patch_flag ) {
+		/* We are to bruteforce the patch key */
+
+		/* Load the patch */
+		read_input_patch();
+
+		if (!key_count)
+			key_count = (0xffffffff - key_override);
+
+		uint32_t stepsize = key_count / 10000;
+		int found = 0;
+		for (uint64_t i = 0; i < key_count; i++) {
+			uint32_t key = key_override + i;
+			if (i++ % stepsize == 0)
+				fprintf(stderr, "\rprogress: %2.02f%% (%llu / %llu)", 100 * i / (float)key_count, i, key_count);
+			cpukeys_override_set(key);
+			if (decrypt_patch_body(
+				&patch_body,
+				&patch_in->body,
+				patch_in->header.proc_sig)) {
+					fprintf(stderr, "\nkey: %x\n", key);
+					found = 1;
+			}
+		}
+		if (!found)
+			r = EXIT_FAILURE;
 	} else if ( create_patch_flag && !extract_patch_flag ) {
 		/* We are to create a new patch */
 		if (key_override)
