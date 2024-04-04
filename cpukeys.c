@@ -1,8 +1,24 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "cpukeys.h"
+
+static int cpu_key_override_set;
+static uint32_t cpu_key_override;
+
+void cpukeys_override_set( uint32_t key ) {
+	cpu_key_override = key;
+	cpu_key_override_set = 1;
+}
+
+void cpukeys_override_clear( void ) {
+	cpu_key_override_set = 0;
+}
 
 uint32_t cpukeys_get_base( uint32_t cpu_sig ) {
+	if (cpu_key_override_set)
+		return cpu_key_override;
+
 	switch ( cpu_sig & 0xFFF ) {
 #ifdef __cpukeys_h__
 		case 0x630: /* Klamath */

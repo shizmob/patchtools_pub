@@ -6,6 +6,9 @@ int fprom_exists( uint32_t addr );
 
 uint32_t fprom_get( uint32_t addr );
 
+uint32_t cpukeys_override_set( uint32_t key );
+uint32_t cpukeys_override_clear( void );
+
 uint32_t cpukeys_get_base( uint32_t proc_sig );
 
 void encrypt_patch_body(

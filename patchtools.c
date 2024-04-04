@@ -25,13 +25,14 @@ char *patch_path;
 char *config_path;
 char *msram_path;
 uint32_t patch_seed;
+uint32_t key_override;
 
 void usage( const char *reason ) {
 	fprintf( stderr, "%s\n", reason );
 	fprintf( stderr,
 	"\tpatchtools -h\n" );
 	fprintf( stderr,
-	"\tpatchtools [-dec] [-p <patch.dat>] [-i <config.txt>]\n\n" );
+	"\tpatchtools [-dec] [-p <patch.dat>] [-k KEY] [-i <config.txt>]\n\n" );
 
 	if ( !help_flag )
 		exit( EXIT_FAILURE );
@@ -64,12 +65,15 @@ void usage( const char *reason ) {
 	"\t\t                  to use or extract. When extracting this\n"
 	"\t\t                  option is not required as the program  \n"
 	"\t\t                  will use the path of the patch file to \n"
-	"\t\t                  generate the output path.\n");
+	"\t\t                  generate the output path.\n"
+	"\t\t\n"
+	"\t\t-k KEY            Specifies key value to use while crypting\n"
+	"\t\t                  patch file.\n");
 }
 
 void parse_args( int argc, char *const *argv ) {
 	char opt;
-	while ( (opt = getopt( argc, argv, ":p:i:dech" )) != -1 ) {
+	while ( (opt = getopt( argc, argv, ":p:i:dechk:" )) != -1 ) {
 		switch( opt ) {
 			case 'p':
 				patch_path = strdup( optarg );
@@ -85,6 +89,9 @@ void parse_args( int argc, char *const *argv ) {
 				break;
 			case 'c':
 				create_patch_flag = 1;
+				break;
+			case 'k':
+				key_override = strtoul(optarg, NULL, 0);
 				break;
 			case 'h':
 				help_flag = 1;
@@ -297,6 +304,8 @@ int main( int argc, char * const *argv ) {
 
 	} else if ( create_patch_flag && !extract_patch_flag ) {
 		/* We are to create a new patch */
+		if (key_override)
+			cpukeys_override_set(key_override);
 
 		/* Load the input and encode it */
 		create_patch();
@@ -308,6 +317,8 @@ int main( int argc, char * const *argv ) {
 
 	} else if ( dump_patch_flag || extract_patch_flag ) {
 		/* The user requested to load and decrypt a patch */
+		if (key_override)
+			cpukeys_override_set(key_override);
 
 		/* Creating and decrypting patches are mutually exclusive ops */
 		if ( create_patch_flag )
