@@ -1,3 +1,6 @@
+CFLAGS += -O3 -ffast-math -march=native
+CPPFLAGS += -DUSE_C_BLOCKFUNC
+
 SRCS_C =\
 	patchfile.c \
 	crypto.c \
@@ -7,10 +10,7 @@ SRCS_C =\
 	file_io.c \
 	filefmt.c
 
-patchtools: $(SRCS_C) opt_cipher.o
-
-opt_cipher.o: opt_cipher.s
-	nasm -felf64 opt_cipher.s
+patchtools: $(SRCS_C)
 
 clean:
 	rm *.o patchtools
