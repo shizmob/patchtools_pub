@@ -101,7 +101,7 @@ void parse_args( int argc, char *const *argv ) {
 }
 
 
-void load_input_patch( void ) {
+void read_input_patch( void ) {
 	char *patch_fn;
 
 	/* Ensure we have a path */
@@ -121,16 +121,22 @@ void load_input_patch( void ) {
 	strncpy( fmt_buf, patch_filename, sizeof fmt_buf );
 	patch_name = strtok( patch_filename, "." );
 	patch_name = strdup( patch_name );
+}
+
+int load_input_patch( void ) {
+	/* Read the patch */
+	read_input_patch();
 
 	/* Decrypt the patch */
-	decrypt_patch_body(
+	if (!decrypt_patch_body(
 		&patch_body,
 		&patch_in->body,
-		patch_in->header.proc_sig);
+		patch_in->header.proc_sig))
+		return 0;
 	//TODO: Header only mode?
 
 	patch_seed = patch_in->body.key_seed;
-
+	return 1;
 }
 
 void write_output_patch( void ) {
@@ -280,6 +286,8 @@ void create_patch( void ) {
 }
 
 int main( int argc, char * const *argv ) {
+	int r = EXIT_SUCCESS;
+
 	/* Parse the command line arguments */
 	parse_args( argc, argv );
 
@@ -306,21 +314,22 @@ int main( int argc, char * const *argv ) {
 			usage("invalid combination of modes");
 
 		/* Load and decrypt the patch */
-		load_input_patch();
+		if (load_input_patch()) {
+			/* Dump the patch if requested */
+			if ( dump_patch_flag )
+				dump_patch();
 
-		/* Dump the patch if requested */
-		if ( dump_patch_flag )
-			dump_patch();
-
-		/* Extract the patch if requested */
-		if ( extract_patch_flag )
-			extract_patch();
-
+			/* Extract the patch if requested */
+			if ( extract_patch_flag )
+				extract_patch();
+		} else {
+			r = EXIT_FAILURE;
+		}
 	} else
 		usage("no mode specified");
 
 	/* Cleanup dynamically allocated memory  */
 	cleanup();
 
-	return EXIT_SUCCESS;
+	return r;
 }

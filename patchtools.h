@@ -14,7 +14,7 @@ void encrypt_patch_body(
 	uint32_t proc_sig,
 	uint32_t seed );
 
-void decrypt_patch_body(
+int decrypt_patch_body(
 	patch_body_t *out,
 	const epatch_body_t *in,
 	uint32_t proc_sig );

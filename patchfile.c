@@ -22,7 +22,7 @@
  *
  * @param ct_integ   The encrypted ICV to validate
  */
-void decrypt_verify_integrity( uint32_t ct_integ ) {
+int decrypt_verify_integrity( uint32_t ct_integ ) {
 	uint32_t integrity_idx, pt_integ, exp_integ;
 
 	/* The ICV is derived from the crypto state before it is encrypted, so
@@ -42,7 +42,7 @@ void decrypt_verify_integrity( uint32_t ct_integ ) {
 		"Integrity check uses unknown FPROM[0x%02X] = 0x%08X\n",
 		integrity_idx,
 		pt_integ );
-		return;
+		return 0;
 	}
 
 	/* Compute the expected ICV */
@@ -55,9 +55,10 @@ void decrypt_verify_integrity( uint32_t ct_integ ) {
 		"Integrity check failed, got 0x%08X expected 0x%08X\n",
 		pt_integ,
 		exp_integ );
-		exit( EXIT_FAILURE );
+		return 0;
 	}
 
+	return 1;
 }
 
 /**
@@ -142,7 +143,7 @@ int derive_key(
  * @param iv       The initialization vector to use.
  * @param key      The key to use.
  */
-void _decrypt_patch(
+int _decrypt_patch(
 	patch_body_t *out,
 	const epatch_body_t *in,
 	uint32_t iv,
@@ -163,7 +164,8 @@ void _decrypt_patch(
 	}
 
 	/* Validate the patch MSRAM contents */
-	decrypt_verify_integrity( in->msram_integrity );
+	if (!decrypt_verify_integrity( in->msram_integrity ))
+		return 0;
 
 	/* Decrypt the patch control register operations */
 	for ( i = 0; i < PATCH_CR_OP_COUNT; i++ ) {
@@ -176,9 +178,11 @@ void _decrypt_patch(
 			crypto_decrypt( in->cr_ops[i].value );
 
 		/* Validate operation */
-		decrypt_verify_integrity( in->cr_ops[i].integrity );
+		if (!decrypt_verify_integrity( in->cr_ops[i].integrity ))
+			return 0;
 	}
 
+	return 1;
 }
 
 /**
@@ -274,7 +278,7 @@ void encrypt_patch_body(
  * @param in       The encrypted patch body to decrypt
  * @param proc_sig The CPUID/processor signature to decrypt for
  */
-void decrypt_patch_body(
+int decrypt_patch_body(
 	patch_body_t *out,
 	const epatch_body_t *in,
 	uint32_t proc_sig ) {
@@ -286,10 +290,10 @@ void decrypt_patch_body(
 		fprintf( stderr,
 			"Patch file uses unknown FPROM[0x%02X] as key.",
 			key_idx );
-		return;
+		return 0;
 	}
 
 	/* Actually decrypt the patch */
-	_decrypt_patch( out, in, iv, key );
+	return _decrypt_patch( out, in, iv, key );
 
 }
